@@ -272,6 +272,9 @@ def add_ports_to_network(task, network_uuid, security_groups=None):
         raise exception.NetworkError(_(
             "No available PXE-enabled port on node %s.") % node.uuid)
 
+    p_groups = {pg.id: pg for pg in
+                task.portgroups} if task.portgroups else None
+
     for ironic_port in pxe_enabled_ports:
         # Skip ports that are missing required information for deploy.
         if not validate_port_info(node, ironic_port):
@@ -280,6 +283,15 @@ def add_ports_to_network(task, network_uuid, security_groups=None):
         body['port']['mac_address'] = ironic_port.address
         binding_profile = {'local_link_information':
                            [portmap[ironic_port.uuid]]}
+        if ironic_port.portgroup_id and ironic_port.portgroup_id in p_groups:
+            # add portgroup information to the port definition
+            bond_interface = p_groups[ironic_port. portgroup_id].properties[
+                "interface_name"]
+            binding_profile["local_group_information"] = {
+                "bond_properties": {
+                    "bond_interface_name": bond_interface},
+                # "pxe_boot": True
+            }
         body['port']['binding:profile'] = binding_profile
         client_id = ironic_port.extra.get('client-id')
         if client_id:
